@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Barcelona EV Infrastructure Analyzer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #080c14;
+      --surface: #0e1420;
+      --surface2: #141c2e;
+      --border: rgba(255,255,255,0.07);
+      --border-bright: rgba(255,255,255,0.14);
+      --text: #e8edf5;
+      --muted: #6b7a96;
+      --accent: #00d4ff;
+      --accent2: #7c3aed;
+      --danger: #ff4757;
+      --success: #00e676;
+      --warning: #ffd600;
+      --font: 'Space Grotesk', sans-serif;
+      --mono: 'Space Mono', monospace;
+      --radius: 12px;
+      --glow: 0 0 40px rgba(0,212,255,0.12);
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); overflow-x: hidden; }
+
+    /* HEADER */
+    header {
+      position: relative;
+      padding: 60px 48px 48px;
+      border-bottom: 1px solid var(--border);
+      overflow: hidden;
+    }
+    header::before {
+      content: '';
+      position: absolute;
+      top: -80px; left: -80px;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(0,212,255,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    header::after {
+      content: '';
+      position: absolute;
+      top: -40px; right: 10%;
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(124,58,237,0.07) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .header-eyebrow {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-eyebrow::before {
+      content: '';
+      width: 24px; height: 1px;
+      background: var(--accent);
+    }
+    h1 {
+      font-size: clamp(28px, 4vw, 48px);
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      max-width: 680px;
+    }
+    h1 span { color: var(--accent); }
+    .header-sub {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.6;
+      max-width: 560px;
+    }
+
+    /* LAYOUT */
+    .main { display: grid; grid-template-columns: 320px 1fr; min-height: calc(100vh - 200px); }
+
+    /* SIDEBAR */
+    aside {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 32px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+    .section-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    /* METRICS */
+    .metrics { display: flex; flex-direction: column; gap: 12px; }
+    .metric-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .metric-card:hover { border-color: var(--border-bright); }
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 3px; height: 100%;
+      background: var(--accent-color, var(--accent));
+      border-radius: 2px 0 0 2px;
+    }
+    .metric-value {
+      font-family: var(--mono);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .metric-label { font-size: 12px; color: var(--muted); }
+
+    /* CONTROLS */
+    .controls { display: flex; flex-direction: column; gap: 20px; }
+    .control-group { display: flex; flex-direction: column; gap: 10px; }
+    .control-group label {
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 500;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .control-group label span {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--accent);
+      background: rgba(0,212,255,0.1);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    input[type=range] {
+      width: 100%;
+      -webkit-appearance: none;
+      height: 4px;
+      background: var(--border-bright);
+      border-radius: 2px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px; height: 16px;
+      background: var(--accent);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(0,212,255,0.4);
+    }
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 20px;
+      background: var(--accent);
+      color: #080c14;
+      border: none;
+      border-radius: var(--radius);
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.01em;
+    }
+    .btn:hover { background: #33ddff; transform: translateY(-1px); box-shadow: var(--glow); }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* LEGEND */
+    .legend { display: flex; flex-direction: column; gap: 10px; }
+    .legend-item { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+    /* MAP AREA */
+    .map-area { display: flex; flex-direction: column; }
+    #map { flex: 1; min-height: 500px; background: #080c14; }
+
+    /* TABLE */
+    .table-section {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 32px 40px;
+    }
+    .table-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .table-title {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .table-badge {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent);
+      background: rgba(0,212,255,0.08);
+      border: 1px solid rgba(0,212,255,0.2);
+      padding: 4px 12px;
+      border-radius: 20px;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { border-bottom: 1px solid var(--border); }
+    th {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 0 16px 14px 0;
+      text-align: left;
+      font-weight: 400;
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+      cursor: default;
+    }
+    tbody tr:hover { background: rgba(255,255,255,0.025); }
+    td {
+      padding: 14px 16px 14px 0;
+      font-size: 14px;
+      color: var(--text);
+    }
+    .rank {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      width: 32px;
+    }
+    .neighborhood-name { font-weight: 500; }
+    .ev-count {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--text);
+    }
+    .supply-bar-wrap { display: flex; align-items: center; gap: 10px; }
+    .supply-bar {
+      height: 4px;
+      background: var(--accent2);
+      border-radius: 2px;
+      min-width: 4px;
+      max-width: 120px;
+    }
+    .supply-val { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+    .deficit-score {
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .deficit-high { color: var(--danger); }
+    .deficit-mid { color: var(--warning); }
+    .deficit-low { color: var(--success); }
+
+    /* LOADER */
+    .loader-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(8,12,20,0.92);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      z-index: 9999;
+      transition: opacity 0.4s;
+    }
+    .loader-overlay.hidden { opacity: 0; pointer-events: none; }
+    .loader-ring {
+      width: 48px; height: 48px;
+      border: 2px solid var(--border-bright);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loader-text {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+
+    /* STATUS BAR */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 40px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); animation: pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    @media (max-width: 900px) {
+      .main { grid-template-columns: 1fr; }
+      aside { border-right: none; border-bottom: 1px solid var(--border); }
+      header { padding: 40px 24px 32px; }
+      .table-section { padding: 24px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="loader-overlay" id="loader">
+  <div class="loader-ring"></div>
+  <div class="loader-text">FETCHING LIVE OSM DATA</div>
+</div>
+
+<header>
+  <div class="header-eyebrow">Barcelona Smart City Initiative</div>
+  <h1>EV Infrastructure <span>Gap Analyzer</span></h1>
+  <p class="header-sub">
+    Municipal electric vehicle registration data cross-referenced against live OpenStreetMap charging infrastructure.
+    Distance-decay buffering isolates true infrastructure deserts.
+  </p>
+</header>
+
+<div class="status-bar">
+  <div class="status-dot"></div>
+  <span id="status-text">Connecting to OpenStreetMap Overpass API...</span>
+</div>
+
+<div class="main">
+  <aside>
+    <div>
+      <div class="section-label">Live Metrics</div>
+      <div class="metrics">
+        <div class="metric-card" style="--accent-color: var(--accent)">
+          <div class="metric-value" id="m-evs">—</div>
+          <div class="metric-label">Registered Electric Vehicles</div>
+        </div>
+        <div class="metric-card" style="--accent-color: var(--success)">
+          <div class="metric-value" id="m-stations">—</div>
+          <div class="metric-label">Live OSM Chargers Located</div>
+        </div>
+        <div class="metric-card" style="--accent-color: var(--accent2)">
+          <div class="metric-value" id="m-hubs">—</div>
+          <div class="metric-label">High-Priority Hubs Proposed</div>
+        </div>
+        <div class="metric-card" style="--accent-color: var(--warning)">
+          <div class="metric-value" id="m-neighborhoods">—</div>
+          <div class="metric-label">Neighborhoods Analyzed</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Configuration</div>
+      <div class="controls">
+        <div class="control-group">
+          <label>Proposed Hubs <span id="hubs-val">8</span></label>
+          <input type="range" id="hubs-slider" min="3" max="15" value="8"
+            oninput="document.getElementById('hubs-val').textContent=this.value"/>
+        </div>
+        <div class="control-group">
+          <label>Decay Scale (km) <span id="decay-val">1.0</span></label>
+          <input type="range" id="decay-slider" min="0.5" max="3.0" step="0.25" value="1.0"
+            oninput="document.getElementById('decay-val').textContent=parseFloat(this.value).toFixed(2)"/>
+        </div>
+        <button class="btn" id="run-btn" onclick="loadData()">
+          ⚡ Analyze Infrastructure
+        </button>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Map Legend</div>
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#00e676"></div>
+          Existing EV charger
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#7c3aed; box-shadow: 0 0 8px rgba(124,58,237,0.6)"></div>
+          Proposed expansion hub
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background: linear-gradient(to right, #ffeda0, #f03b20); width:24px; border-radius:2px"></div>
+          EV demand density
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="map-area">
+    <div id="map"></div>
+  </div>
+</div>
+
+<div class="table-section">
+  <div class="table-header">
+    <div class="table-title">Priority Expansion Targets</div>
+    <div class="table-badge" id="table-badge">Loading...</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Neighborhood</th>
+        <th>Registered EVs</th>
+        <th>Decayed Supply Index</th>
+        <th>Deficit Score</th>
+      </tr>
+    </thead>
+    <tbody id="results-table">
+      <tr><td colspan="5" style="color:var(--muted);padding:24px 0;font-size:13px">Loading data...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+  let map = L.map('map', { zoomControl: false }).setView([41.3874, 2.1686], 12);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CartoDB',
+    subdomains: 'abcd', maxZoom: 19
+  }).addTo(map);
+
+  let layers = { demand: null, stations: null, gaps: null };
+
+  function clearLayers() {
+    Object.values(layers).forEach(l => { if (l) map.removeLayer(l); });
+  }
+
+  function getColor(ev, min, max) {
+    const t = max > min ? (ev - min) / (max - min) : 0;
+    if (t < 0.33) return `rgba(255,237,160,${0.3 + t * 0.4})`;
+    if (t < 0.66) return `rgba(254,178,76,${0.5 + t * 0.3})`;
+    return `rgba(240,59,32,${0.6 + t * 0.3})`;
+  }
+
+  function renderMap(data) {
+    clearLayers();
+    const evCounts = data.geojson.features.map(f => f.properties.EV_Count || 0);
+    const min = Math.min(...evCounts), max = Math.max(...evCounts);
+
+    layers.demand = L.geoJSON(data.geojson, {
+      style: f => ({
+        fillColor: getColor(f.properties.EV_Count || 0, min, max),
+        color: 'rgba(255,255,255,0.08)',
+        weight: 1,
+        fillOpacity: 0.75
+      }),
+      onEachFeature: (f, layer) => {
+        layer.bindTooltip(`
+          <div style="font-family:'Space Grotesk',sans-serif;background:#0e1420;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 14px;color:#e8edf5;font-size:13px">
+            <strong>${f.properties.Display_Name || 'Unknown'}</strong><br/>
+            <span style="color:#6b7a96">Registered EVs:</span> <span style="color:#00d4ff;font-family:'Space Mono',monospace">${f.properties.EV_Count || 0}</span>
+          </div>
+        `, { className: 'custom-tooltip', sticky: true });
+      }
+    }).addTo(map);
+
+    const stationIcon = L.divIcon({
+      className: '',
+      html: '<div style="width:8px;height:8px;background:#00e676;border-radius:50%;border:1.5px solid rgba(0,230,118,0.4);box-shadow:0 0 6px rgba(0,230,118,0.6)"></div>',
+      iconSize: [8, 8], iconAnchor: [4, 4]
+    });
+    layers.stations = L.layerGroup(
+      data.stations.map(([lat, lon]) => L.marker([lat, lon], { icon: stationIcon }).bindTooltip('Existing EV Charger', { className: 'custom-tooltip' }))
+    ).addTo(map);
+
+    const gapIcon = (name, evs, score) => L.divIcon({
+      className: '',
+      html: `<div style="width:18px;height:18px;background:#7c3aed;border-radius:50%;border:2px solid rgba(124,58,237,0.5);box-shadow:0 0 14px rgba(124,58,237,0.7);cursor:pointer"></div>`,
+      iconSize: [18, 18], iconAnchor: [9, 9]
+    });
+
+    layers.gaps = L.layerGroup(
+      data.top_gaps.map(g => L.marker(g.coord, { icon: gapIcon(g.name, g.ev_count, g.deficit_score) })
+        .bindTooltip(`
+          <div style="font-family:'Space Grotesk',sans-serif;background:#0e1420;border:1px solid rgba(124,58,237,0.3);border-radius:8px;padding:10px 14px;color:#e8edf5;font-size:13px;min-width:180px">
+            <strong style="color:#a78bfa">${g.name}</strong><br/>
+            <span style="color:#6b7a96">EVs:</span> <span style="font-family:'Space Mono',monospace">${g.ev_count}</span><br/>
+            <span style="color:#6b7a96">Deficit Score:</span> <span style="color:#ff4757;font-family:'Space Mono',monospace">${g.deficit_score}</span>
+          </div>
+        `, { className: 'custom-tooltip' })
+      )
+    ).addTo(map);
+  }
+
+  function renderTable(gaps) {
+    const maxScore = Math.max(...gaps.map(g => g.deficit_score));
+    const maxSupply = Math.max(...gaps.map(g => g.decayed_supply));
+    const tbody = document.getElementById('results-table');
+    tbody.innerHTML = gaps.map((g, i) => {
+      const scoreClass = g.deficit_score > maxScore * 0.66 ? 'deficit-high' : g.deficit_score > maxScore * 0.33 ? 'deficit-mid' : 'deficit-low';
+      const barW = maxSupply > 0 ? Math.round((g.decayed_supply / maxSupply) * 100) : 0;
+      return `<tr>
+        <td class="rank">${String(i+1).padStart(2,'0')}</td>
+        <td class="neighborhood-name">${g.name}</td>
+        <td class="ev-count">${g.ev_count.toLocaleString()}</td>
+        <td>
+          <div class="supply-bar-wrap">
+            <div class="supply-bar" style="width:${barW}px"></div>
+            <span class="supply-val">${g.decayed_supply}</span>
+          </div>
+        </td>
+        <td class="deficit-score ${scoreClass}">${g.deficit_score}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function updateMetrics(m) {
+    document.getElementById('m-evs').textContent = m.total_evs.toLocaleString();
+    document.getElementById('m-stations').textContent = m.total_stations;
+    document.getElementById('m-hubs').textContent = m.num_proposals;
+    document.getElementById('m-neighborhoods').textContent = m.total_neighborhoods;
+    document.getElementById('table-badge').textContent = `${m.num_proposals} TARGETS IDENTIFIED`;
+    document.getElementById('status-text').textContent = `Live data · ${m.total_stations} chargers · ${m.total_neighborhoods} neighborhoods analyzed`;
+  }
+
+  async function loadData() {
+    const btn = document.getElementById('run-btn');
+    const loader = document.getElementById('loader');
+    btn.disabled = true;
+    loader.classList.remove('hidden');
+    const hubs = document.getElementById('hubs-slider').value;
+    const decay = document.getElementById('decay-slider').value;
+    try {
+      const res = await fetch(`/api/data?hubs=${hubs}&decay=${decay}`);
+      const data = await res.json();
+      renderMap(data);
+      renderTable(data.top_gaps);
+      updateMetrics(data.metrics);
+    } catch(e) {
+      document.getElementById('status-text').textContent = 'Error loading data. Check console.';
+      console.error(e);
+    } finally {
+      loader.classList.add('hidden');
+      btn.disabled = false;
+    }
+  }
+
+  // Auto-load on page start
+  window.addEventListener('DOMContentLoaded', loadData);
+</script>
+</body>
+</html>
