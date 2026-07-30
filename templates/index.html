@@ -10,327 +10,175 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg: #080c14;
-      --surface: #0e1420;
-      --surface2: #141c2e;
-      --border: rgba(255,255,255,0.07);
-      --border-bright: rgba(255,255,255,0.14);
-      --text: #e8edf5;
-      --muted: #6b7a96;
-      --accent: #00d4ff;
-      --accent2: #7c3aed;
-      --danger: #ff4757;
-      --success: #00e676;
-      --warning: #ffd600;
-      --font: 'Space Grotesk', sans-serif;
-      --mono: 'Space Mono', monospace;
+      --bg: #080c14; --surface: #0e1420; --surface2: #141c2e;
+      --border: rgba(255,255,255,0.07); --border-bright: rgba(255,255,255,0.14);
+      --text: #e8edf5; --muted: #6b7a96;
+      --accent: #00d4ff; --accent2: #7c3aed;
+      --danger: #ff4757; --success: #00e676; --warning: #ffd600;
+      --font: 'Space Grotesk', sans-serif; --mono: 'Space Mono', monospace;
       --radius: 12px;
-      --glow: 0 0 40px rgba(0,212,255,0.12);
     }
-
     html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); overflow-x: hidden; }
 
-    /* HEADER */
     header {
-      position: relative;
-      padding: 60px 48px 48px;
-      border-bottom: 1px solid var(--border);
-      overflow: hidden;
+      position: relative; padding: 48px 48px 36px;
+      border-bottom: 1px solid var(--border); overflow: hidden;
     }
     header::before {
-      content: '';
-      position: absolute;
-      top: -80px; left: -80px;
+      content: ''; position: absolute; top: -80px; left: -80px;
       width: 500px; height: 500px;
       background: radial-gradient(circle, rgba(0,212,255,0.08) 0%, transparent 70%);
       pointer-events: none;
     }
-    header::after {
-      content: '';
-      position: absolute;
-      top: -40px; right: 10%;
-      width: 300px; height: 300px;
-      background: radial-gradient(circle, rgba(124,58,237,0.07) 0%, transparent 70%);
-      pointer-events: none;
-    }
     .header-eyebrow {
-      font-family: var(--mono);
-      font-size: 11px;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em;
+      text-transform: uppercase; color: var(--accent); margin-bottom: 12px;
+      display: flex; align-items: center; gap: 10px;
     }
-    .header-eyebrow::before {
-      content: '';
-      width: 24px; height: 1px;
-      background: var(--accent);
-    }
-    h1 {
-      font-size: clamp(28px, 4vw, 48px);
-      font-weight: 700;
-      line-height: 1.1;
-      letter-spacing: -0.02em;
-      max-width: 680px;
-    }
+    .header-eyebrow::before { content: ''; width: 24px; height: 1px; background: var(--accent); }
+    h1 { font-size: clamp(24px, 3.5vw, 42px); font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; }
     h1 span { color: var(--accent); }
-    .header-sub {
-      margin-top: 16px;
-      color: var(--muted);
-      font-size: 15px;
-      line-height: 1.6;
-      max-width: 560px;
-    }
+    .header-sub { margin-top: 12px; color: var(--muted); font-size: 14px; line-height: 1.6; max-width: 560px; }
 
-    /* LAYOUT */
-    .main { display: grid; grid-template-columns: 320px 1fr; min-height: calc(100vh - 200px); }
+    .main { display: grid; grid-template-columns: 300px 1fr; min-height: calc(100vh - 180px); }
 
-    /* SIDEBAR */
     aside {
-      background: var(--surface);
-      border-right: 1px solid var(--border);
-      padding: 32px 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 32px;
+      background: var(--surface); border-right: 1px solid var(--border);
+      padding: 28px 20px; display: flex; flex-direction: column; gap: 28px; overflow-y: auto;
     }
     .section-label {
-      font-family: var(--mono);
-      font-size: 10px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 16px;
+      font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 12px;
     }
-
-    /* METRICS */
-    .metrics { display: flex; flex-direction: column; gap: 12px; }
+    .metrics { display: flex; flex-direction: column; gap: 10px; }
     .metric-card {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px 20px;
-      position: relative;
-      overflow: hidden;
-      transition: border-color 0.2s;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px;
+      position: relative; overflow: hidden; transition: border-color 0.2s;
     }
     .metric-card:hover { border-color: var(--border-bright); }
     .metric-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0;
+      content: ''; position: absolute; top: 0; left: 0;
       width: 3px; height: 100%;
-      background: var(--accent-color, var(--accent));
-      border-radius: 2px 0 0 2px;
+      background: var(--accent-color, var(--accent)); border-radius: 2px 0 0 2px;
     }
-    .metric-value {
-      font-family: var(--mono);
-      font-size: 28px;
-      font-weight: 700;
-      color: var(--text);
-      line-height: 1;
-      margin-bottom: 4px;
-    }
-    .metric-label { font-size: 12px; color: var(--muted); }
+    .metric-value { font-family: var(--mono); font-size: 24px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+    .metric-label { font-size: 11px; color: var(--muted); }
 
-    /* CONTROLS */
-    .controls { display: flex; flex-direction: column; gap: 20px; }
-    .control-group { display: flex; flex-direction: column; gap: 10px; }
+    .controls { display: flex; flex-direction: column; gap: 18px; }
+    .control-group { display: flex; flex-direction: column; gap: 8px; }
     .control-group label {
-      font-size: 13px;
-      color: var(--text);
-      font-weight: 500;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      font-size: 13px; color: var(--text); font-weight: 500;
+      display: flex; justify-content: space-between; align-items: center;
     }
     .control-group label span {
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--accent);
-      background: rgba(0,212,255,0.1);
-      padding: 2px 8px;
-      border-radius: 4px;
+      font-family: var(--mono); font-size: 11px; color: var(--accent);
+      background: rgba(0,212,255,0.1); padding: 2px 8px; border-radius: 4px;
     }
     input[type=range] {
-      width: 100%;
-      -webkit-appearance: none;
-      height: 4px;
-      background: var(--border-bright);
-      border-radius: 2px;
-      outline: none;
+      width: 100%; -webkit-appearance: none; height: 4px;
+      background: var(--border-bright); border-radius: 2px; outline: none;
     }
     input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 16px; height: 16px;
-      background: var(--accent);
-      border-radius: 50%;
-      cursor: pointer;
-      box-shadow: 0 0 10px rgba(0,212,255,0.4);
+      -webkit-appearance: none; width: 14px; height: 14px;
+      background: var(--accent); border-radius: 50%; cursor: pointer;
+      box-shadow: 0 0 8px rgba(0,212,255,0.4);
     }
     .btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 12px 20px;
-      background: var(--accent);
-      color: #080c14;
-      border: none;
-      border-radius: var(--radius);
-      font-family: var(--font);
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      letter-spacing: 0.01em;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 11px 20px; background: var(--accent); color: #080c14;
+      border: none; border-radius: var(--radius); font-family: var(--font);
+      font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;
     }
-    .btn:hover { background: #33ddff; transform: translateY(-1px); box-shadow: var(--glow); }
-    .btn:active { transform: translateY(0); }
+    .btn:hover { background: #33ddff; transform: translateY(-1px); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-    /* LEGEND */
-    .legend { display: flex; flex-direction: column; gap: 10px; }
-    .legend-item { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
-    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    /* LEAFLET LAYER CONTROL DARK THEME */
+    .leaflet-control-layers {
+      background: var(--surface) !important;
+      border: 1px solid var(--border-bright) !important;
+      border-radius: var(--radius) !important;
+      color: var(--text) !important;
+      font-family: var(--font) !important;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4) !important;
+      padding: 8px 4px !important;
+    }
+    .leaflet-control-layers-list { padding: 4px 8px; }
+    .leaflet-control-layers label { color: var(--text) !important; font-size: 13px; display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+    .leaflet-control-layers-separator { border-top: 1px solid var(--border) !important; margin: 6px 0; }
+    .leaflet-control-layers-toggle { background-color: var(--surface2) !important; }
 
-    /* MAP AREA */
-    .map-area { display: flex; flex-direction: column; }
-    #map { flex: 1; min-height: 500px; background: #080c14; }
+    .map-area { display: flex; flex-direction: column; position: relative; }
+    #map { flex: 1; min-height: 520px; }
 
-    /* TABLE */
-    .table-section {
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      padding: 32px 40px;
-    }
-    .table-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 24px;
-    }
-    .table-title {
-      font-size: 18px;
-      font-weight: 600;
-      letter-spacing: -0.01em;
-    }
-    .table-badge {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--accent);
-      background: rgba(0,212,255,0.08);
-      border: 1px solid rgba(0,212,255,0.2);
-      padding: 4px 12px;
-      border-radius: 20px;
-    }
-    table { width: 100%; border-collapse: collapse; }
-    thead tr { border-bottom: 1px solid var(--border); }
-    th {
-      font-family: var(--mono);
-      font-size: 10px;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--muted);
-      padding: 0 16px 14px 0;
-      text-align: left;
-      font-weight: 400;
-    }
-    tbody tr {
-      border-bottom: 1px solid var(--border);
-      transition: background 0.15s;
-      cursor: default;
-    }
-    tbody tr:hover { background: rgba(255,255,255,0.025); }
-    td {
-      padding: 14px 16px 14px 0;
-      font-size: 14px;
-      color: var(--text);
-    }
-    .rank {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--muted);
-      width: 32px;
-    }
-    .neighborhood-name { font-weight: 500; }
-    .ev-count {
-      font-family: var(--mono);
-      font-size: 13px;
-      color: var(--text);
-    }
-    .supply-bar-wrap { display: flex; align-items: center; gap: 10px; }
-    .supply-bar {
-      height: 4px;
-      background: var(--accent2);
-      border-radius: 2px;
-      min-width: 4px;
-      max-width: 120px;
-    }
-    .supply-val { font-family: var(--mono); font-size: 12px; color: var(--muted); }
-    .deficit-score {
-      font-family: var(--mono);
-      font-size: 14px;
-      font-weight: 700;
-    }
-    .deficit-high { color: var(--danger); }
-    .deficit-mid { color: var(--warning); }
-    .deficit-low { color: var(--success); }
-
-    /* LOADER */
-    .loader-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(8,12,20,0.92);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 20px;
-      z-index: 9999;
-      transition: opacity 0.4s;
-    }
-    .loader-overlay.hidden { opacity: 0; pointer-events: none; }
-    .loader-ring {
-      width: 48px; height: 48px;
-      border: 2px solid var(--border-bright);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .loader-text {
-      font-family: var(--mono);
-      font-size: 12px;
-      letter-spacing: 0.12em;
-      color: var(--muted);
-    }
-
-    /* STATUS BAR */
     .status-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 40px;
-      background: var(--surface2);
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 40px; background: var(--surface2);
       border-bottom: 1px solid var(--border);
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--muted);
+      font-family: var(--mono); font-size: 11px; color: var(--muted);
     }
     .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); animation: pulse 2s ease-in-out infinite; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
-    @media (max-width: 900px) {
+    .table-section { background: var(--surface); border-top: 1px solid var(--border); padding: 28px 36px; }
+    .table-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .table-title { font-size: 17px; font-weight: 600; }
+    .table-badge {
+      font-family: var(--mono); font-size: 11px; color: var(--accent);
+      background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.2);
+      padding: 3px 12px; border-radius: 20px;
+    }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 500px; }
+    thead tr { border-bottom: 1px solid var(--border); }
+    th {
+      font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em;
+      text-transform: uppercase; color: var(--muted);
+      padding: 0 16px 12px 0; text-align: left; font-weight: 400;
+    }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; }
+    tbody tr:hover { background: rgba(255,255,255,0.025); }
+    td { padding: 13px 16px 13px 0; font-size: 13px; }
+    .rank { font-family: var(--mono); font-size: 11px; color: var(--muted); width: 28px; }
+    .neighborhood-name { font-weight: 500; }
+    .ev-count { font-family: var(--mono); font-size: 12px; }
+    .supply-bar-wrap { display: flex; align-items: center; gap: 8px; }
+    .supply-bar { height: 4px; background: var(--accent2); border-radius: 2px; min-width: 4px; }
+    .supply-val { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+    .deficit-score { font-family: var(--mono); font-size: 13px; font-weight: 700; }
+    .deficit-high { color: var(--danger); }
+    .deficit-mid { color: var(--warning); }
+    .deficit-low { color: var(--success); }
+
+    .loader-overlay {
+      position: fixed; inset: 0; background: rgba(8,12,20,0.92);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; z-index: 9999; transition: opacity 0.4s;
+    }
+    .loader-overlay.hidden { opacity: 0; pointer-events: none; }
+    .loader-ring {
+      width: 44px; height: 44px; border: 2px solid var(--border-bright);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loader-text { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; color: var(--muted); }
+
+    .error-banner {
+      background: rgba(255,71,87,0.1); border: 1px solid rgba(255,71,87,0.3);
+      color: #ff4757; padding: 10px 16px; border-radius: 8px;
+      font-size: 12px; display: none;
+    }
+
+    @media (max-width: 860px) {
       .main { grid-template-columns: 1fr; }
       aside { border-right: none; border-bottom: 1px solid var(--border); }
-      header { padding: 40px 24px 32px; }
-      .table-section { padding: 24px; }
+      .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      header { padding: 32px 20px 24px; }
+      .status-bar { padding: 8px 20px; }
+      .table-section { padding: 20px; }
+      #map { min-height: 400px; }
     }
   </style>
 </head>
@@ -338,16 +186,13 @@
 
 <div class="loader-overlay" id="loader">
   <div class="loader-ring"></div>
-  <div class="loader-text">FETCHING LIVE OSM DATA</div>
+  <div class="loader-text" id="loader-text">FETCHING LIVE OSM DATA...</div>
 </div>
 
 <header>
   <div class="header-eyebrow">Barcelona Smart City Initiative</div>
   <h1>EV Infrastructure <span>Gap Analyzer</span></h1>
-  <p class="header-sub">
-    Municipal electric vehicle registration data cross-referenced against live OpenStreetMap charging infrastructure.
-    Distance-decay buffering isolates true infrastructure deserts.
-  </p>
+  <p class="header-sub">Municipal EV registration data cross-referenced against live OpenStreetMap charging infrastructure using distance-decay buffering.</p>
 </header>
 
 <div class="status-bar">
@@ -362,19 +207,19 @@
       <div class="metrics">
         <div class="metric-card" style="--accent-color: var(--accent)">
           <div class="metric-value" id="m-evs">—</div>
-          <div class="metric-label">Registered Electric Vehicles</div>
+          <div class="metric-label">Registered EVs</div>
         </div>
         <div class="metric-card" style="--accent-color: var(--success)">
           <div class="metric-value" id="m-stations">—</div>
-          <div class="metric-label">Live OSM Chargers Located</div>
+          <div class="metric-label">OSM Chargers Found</div>
         </div>
         <div class="metric-card" style="--accent-color: var(--accent2)">
           <div class="metric-value" id="m-hubs">—</div>
-          <div class="metric-label">High-Priority Hubs Proposed</div>
+          <div class="metric-label">Hubs Proposed</div>
         </div>
         <div class="metric-card" style="--accent-color: var(--warning)">
           <div class="metric-value" id="m-neighborhoods">—</div>
-          <div class="metric-label">Neighborhoods Analyzed</div>
+          <div class="metric-label">Neighborhoods</div>
         </div>
       </div>
     </div>
@@ -382,37 +227,18 @@
     <div>
       <div class="section-label">Configuration</div>
       <div class="controls">
+        <div class="error-banner" id="error-banner"></div>
         <div class="control-group">
           <label>Proposed Hubs <span id="hubs-val">8</span></label>
           <input type="range" id="hubs-slider" min="3" max="15" value="8"
             oninput="document.getElementById('hubs-val').textContent=this.value"/>
         </div>
         <div class="control-group">
-          <label>Decay Scale (km) <span id="decay-val">1.0</span></label>
+          <label>Decay Scale (km) <span id="decay-val">1.00</span></label>
           <input type="range" id="decay-slider" min="0.5" max="3.0" step="0.25" value="1.0"
             oninput="document.getElementById('decay-val').textContent=parseFloat(this.value).toFixed(2)"/>
         </div>
-        <button class="btn" id="run-btn" onclick="loadData()">
-          ⚡ Analyze Infrastructure
-        </button>
-      </div>
-    </div>
-
-    <div>
-      <div class="section-label">Map Legend</div>
-      <div class="legend">
-        <div class="legend-item">
-          <div class="legend-dot" style="background:#00e676"></div>
-          Existing EV charger
-        </div>
-        <div class="legend-item">
-          <div class="legend-dot" style="background:#7c3aed; box-shadow: 0 0 8px rgba(124,58,237,0.6)"></div>
-          Proposed expansion hub
-        </div>
-        <div class="legend-item">
-          <div class="legend-dot" style="background: linear-gradient(to right, #ffeda0, #f03b20); width:24px; border-radius:2px"></div>
-          EV demand density
-        </div>
+        <button class="btn" id="run-btn" onclick="loadData()">⚡ Analyze Infrastructure</button>
       </div>
     </div>
   </aside>
@@ -427,36 +253,51 @@
     <div class="table-title">Priority Expansion Targets</div>
     <div class="table-badge" id="table-badge">Loading...</div>
   </div>
-  <table>
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Neighborhood</th>
-        <th>Registered EVs</th>
-        <th>Decayed Supply Index</th>
-        <th>Deficit Score</th>
-      </tr>
-    </thead>
-    <tbody id="results-table">
-      <tr><td colspan="5" style="color:var(--muted);padding:24px 0;font-size:13px">Loading data...</td></tr>
-    </tbody>
-  </table>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Neighborhood</th>
+          <th>Registered EVs</th>
+          <th>Decayed Supply</th>
+          <th>Deficit Score</th>
+        </tr>
+      </thead>
+      <tbody id="results-table">
+        <tr><td colspan="5" style="color:var(--muted);padding:20px 0;font-size:13px">Loading data...</td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <script>
-  let map = L.map('map', { zoomControl: false }).setView([41.3874, 2.1686], 12);
+  // Init map
+  const map = L.map('map', { zoomControl: false }).setView([41.3874, 2.1686], 12);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap © CartoDB',
-    subdomains: 'abcd', maxZoom: 19
-  }).addTo(map);
+  // Base layers
+  const darkTile = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CartoDB', subdomains: 'abcd', maxZoom: 19
+  });
+  const lightTile = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CartoDB', subdomains: 'abcd', maxZoom: 19
+  });
+  darkTile.addTo(map);
 
-  let layers = { demand: null, stations: null, gaps: null };
+  // Overlay layers (will be populated after data loads)
+  let demandLayer = L.layerGroup().addTo(map);
+  let stationsLayer = L.layerGroup().addTo(map);
+  let gapsLayer = L.layerGroup().addTo(map);
 
-  function clearLayers() {
-    Object.values(layers).forEach(l => { if (l) map.removeLayer(l); });
-  }
+  // Layer control
+  const baseLayers = { 'Dark': darkTile, 'Light': lightTile };
+  const overlayLayers = {
+    'EV Demand Heatmap': demandLayer,
+    'Current Charging Stations': stationsLayer,
+    'AI-Proposed Expansion Hubs': gapsLayer
+  };
+  L.control.layers(baseLayers, overlayLayers, { position: 'topright', collapsed: false }).addTo(map);
 
   function getColor(ev, min, max) {
     const t = max > min ? (ev - min) / (max - min) : 0;
@@ -466,101 +307,117 @@
   }
 
   function renderMap(data) {
-    clearLayers();
+    demandLayer.clearLayers();
+    stationsLayer.clearLayers();
+    gapsLayer.clearLayers();
+
     const evCounts = data.geojson.features.map(f => f.properties.EV_Count || 0);
     const min = Math.min(...evCounts), max = Math.max(...evCounts);
 
-    layers.demand = L.geoJSON(data.geojson, {
+    // Demand heatmap
+    L.geoJSON(data.geojson, {
       style: f => ({
         fillColor: getColor(f.properties.EV_Count || 0, min, max),
-        color: 'rgba(255,255,255,0.08)',
-        weight: 1,
-        fillOpacity: 0.75
+        color: 'rgba(255,255,255,0.1)', weight: 1, fillOpacity: 0.75
       }),
       onEachFeature: (f, layer) => {
         layer.bindTooltip(`
           <div style="font-family:'Space Grotesk',sans-serif;background:#0e1420;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 14px;color:#e8edf5;font-size:13px">
             <strong>${f.properties.Display_Name || 'Unknown'}</strong><br/>
-            <span style="color:#6b7a96">Registered EVs:</span> <span style="color:#00d4ff;font-family:'Space Mono',monospace">${f.properties.EV_Count || 0}</span>
-          </div>
-        `, { className: 'custom-tooltip', sticky: true });
+            <span style="color:#6b7a96">EVs:</span> <span style="color:#00d4ff;font-family:'Space Mono',monospace">${f.properties.EV_Count || 0}</span>
+          </div>`, { sticky: true });
       }
-    }).addTo(map);
+    }).addTo(demandLayer);
 
-    const stationIcon = L.divIcon({
-      className: '',
-      html: '<div style="width:8px;height:8px;background:#00e676;border-radius:50%;border:1.5px solid rgba(0,230,118,0.4);box-shadow:0 0 6px rgba(0,230,118,0.6)"></div>',
-      iconSize: [8, 8], iconAnchor: [4, 4]
+    // Charging stations
+    if (data.stations && data.stations.length > 0) {
+      data.stations.forEach(([lat, lon]) => {
+        const icon = L.divIcon({
+          className: '',
+          html: '<div style="width:8px;height:8px;background:#00e676;border-radius:50%;border:1.5px solid rgba(0,230,118,0.5);box-shadow:0 0 6px rgba(0,230,118,0.7)"></div>',
+          iconSize: [8,8], iconAnchor: [4,4]
+        });
+        L.marker([lat, lon], { icon }).bindTooltip('Existing EV Charger').addTo(stationsLayer);
+      });
+    }
+
+    // Proposed hubs
+    data.top_gaps.forEach(g => {
+      const icon = L.divIcon({
+        className: '',
+        html: '<div style="width:18px;height:18px;background:#7c3aed;border-radius:50%;border:2px solid rgba(124,58,237,0.5);box-shadow:0 0 14px rgba(124,58,237,0.8)"></div>',
+        iconSize: [18,18], iconAnchor: [9,9]
+      });
+      L.marker(g.coord, { icon }).bindTooltip(`
+        <div style="font-family:'Space Grotesk',sans-serif;background:#0e1420;border:1px solid rgba(124,58,237,0.3);border-radius:8px;padding:10px 14px;color:#e8edf5;font-size:13px;min-width:180px">
+          <strong style="color:#a78bfa">${g.name}</strong><br/>
+          <span style="color:#6b7a96">EVs:</span> <span style="font-family:'Space Mono',monospace">${g.ev_count}</span><br/>
+          <span style="color:#6b7a96">Deficit Score:</span> <span style="color:#ff4757;font-family:'Space Mono',monospace">${g.deficit_score}</span>
+        </div>`).addTo(gapsLayer);
     });
-    layers.stations = L.layerGroup(
-      data.stations.map(([lat, lon]) => L.marker([lat, lon], { icon: stationIcon }).bindTooltip('Existing EV Charger', { className: 'custom-tooltip' }))
-    ).addTo(map);
-
-    const gapIcon = (name, evs, score) => L.divIcon({
-      className: '',
-      html: `<div style="width:18px;height:18px;background:#7c3aed;border-radius:50%;border:2px solid rgba(124,58,237,0.5);box-shadow:0 0 14px rgba(124,58,237,0.7);cursor:pointer"></div>`,
-      iconSize: [18, 18], iconAnchor: [9, 9]
-    });
-
-    layers.gaps = L.layerGroup(
-      data.top_gaps.map(g => L.marker(g.coord, { icon: gapIcon(g.name, g.ev_count, g.deficit_score) })
-        .bindTooltip(`
-          <div style="font-family:'Space Grotesk',sans-serif;background:#0e1420;border:1px solid rgba(124,58,237,0.3);border-radius:8px;padding:10px 14px;color:#e8edf5;font-size:13px;min-width:180px">
-            <strong style="color:#a78bfa">${g.name}</strong><br/>
-            <span style="color:#6b7a96">EVs:</span> <span style="font-family:'Space Mono',monospace">${g.ev_count}</span><br/>
-            <span style="color:#6b7a96">Deficit Score:</span> <span style="color:#ff4757;font-family:'Space Mono',monospace">${g.deficit_score}</span>
-          </div>
-        `, { className: 'custom-tooltip' })
-      )
-    ).addTo(map);
   }
 
   function renderTable(gaps) {
     const maxScore = Math.max(...gaps.map(g => g.deficit_score));
     const maxSupply = Math.max(...gaps.map(g => g.decayed_supply));
-    const tbody = document.getElementById('results-table');
-    tbody.innerHTML = gaps.map((g, i) => {
+    document.getElementById('results-table').innerHTML = gaps.map((g, i) => {
       const scoreClass = g.deficit_score > maxScore * 0.66 ? 'deficit-high' : g.deficit_score > maxScore * 0.33 ? 'deficit-mid' : 'deficit-low';
-      const barW = maxSupply > 0 ? Math.round((g.decayed_supply / maxSupply) * 100) : 0;
+      const barW = maxSupply > 0 ? Math.round((g.decayed_supply / maxSupply) * 100) : 4;
       return `<tr>
         <td class="rank">${String(i+1).padStart(2,'0')}</td>
         <td class="neighborhood-name">${g.name}</td>
         <td class="ev-count">${g.ev_count.toLocaleString()}</td>
-        <td>
-          <div class="supply-bar-wrap">
-            <div class="supply-bar" style="width:${barW}px"></div>
-            <span class="supply-val">${g.decayed_supply}</span>
-          </div>
-        </td>
+        <td><div class="supply-bar-wrap"><div class="supply-bar" style="width:${barW}px"></div><span class="supply-val">${g.decayed_supply}</span></div></td>
         <td class="deficit-score ${scoreClass}">${g.deficit_score}</td>
       </tr>`;
     }).join('');
   }
 
-  function updateMetrics(m) {
-    document.getElementById('m-evs').textContent = m.total_evs.toLocaleString();
-    document.getElementById('m-stations').textContent = m.total_stations;
-    document.getElementById('m-hubs').textContent = m.num_proposals;
-    document.getElementById('m-neighborhoods').textContent = m.total_neighborhoods;
-    document.getElementById('table-badge').textContent = `${m.num_proposals} TARGETS IDENTIFIED`;
-    document.getElementById('status-text').textContent = `Live data · ${m.total_stations} chargers · ${m.total_neighborhoods} neighborhoods analyzed`;
+  function showError(msg) {
+    const b = document.getElementById('error-banner');
+    b.textContent = msg; b.style.display = 'block';
   }
 
   async function loadData() {
     const btn = document.getElementById('run-btn');
     const loader = document.getElementById('loader');
+    const errorBanner = document.getElementById('error-banner');
+    errorBanner.style.display = 'none';
     btn.disabled = true;
     loader.classList.remove('hidden');
+    document.getElementById('loader-text').textContent = 'FETCHING LIVE OSM DATA...';
+
     const hubs = document.getElementById('hubs-slider').value;
     const decay = document.getElementById('decay-slider').value;
+
     try {
       const res = await fetch(`/api/data?hubs=${hubs}&decay=${decay}`);
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json();
+
+      if (data.error) throw new Error(data.error);
+
       renderMap(data);
       renderTable(data.top_gaps);
-      updateMetrics(data.metrics);
+
+      const m = data.metrics;
+      document.getElementById('m-evs').textContent = m.total_evs.toLocaleString();
+      document.getElementById('m-stations').textContent = m.total_stations;
+      document.getElementById('m-hubs').textContent = m.num_proposals;
+      document.getElementById('m-neighborhoods').textContent = m.total_neighborhoods;
+      document.getElementById('table-badge').textContent = `${m.num_proposals} TARGETS IDENTIFIED`;
+
+      const stationNote = m.total_stations === 0 ? ' · OSM chargers unavailable (API timeout)' : '';
+      document.getElementById('status-text').textContent =
+        `Live data · ${m.total_stations} chargers · ${m.total_neighborhoods} neighborhoods analyzed${stationNote}`;
+
+      if (m.total_stations === 0) {
+        showError('OSM charger data unavailable — Overpass API may be temporarily down. Deficit scores still calculated.');
+      }
+
     } catch(e) {
-      document.getElementById('status-text').textContent = 'Error loading data. Check console.';
+      showError(`Error: ${e.message}`);
+      document.getElementById('status-text').textContent = 'Failed to load data';
       console.error(e);
     } finally {
       loader.classList.add('hidden');
@@ -568,7 +425,6 @@
     }
   }
 
-  // Auto-load on page start
   window.addEventListener('DOMContentLoaded', loadData);
 </script>
 </body>
