@@ -94,7 +94,6 @@
     .btn:hover { background: #33ddff; transform: translateY(-1px); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-    /* LEAFLET LAYER CONTROL DARK THEME */
     .leaflet-control-layers {
       background: var(--surface) !important;
       border: 1px solid var(--border-bright) !important;
@@ -107,9 +106,8 @@
     .leaflet-control-layers-list { padding: 4px 8px; }
     .leaflet-control-layers label { color: var(--text) !important; font-size: 13px; display: flex; align-items: center; gap: 6px; margin: 4px 0; }
     .leaflet-control-layers-separator { border-top: 1px solid var(--border) !important; margin: 6px 0; }
-    .leaflet-control-layers-toggle { background-color: var(--surface2) !important; }
 
-    .map-area { display: flex; flex-direction: column; position: relative; }
+    .map-area { display: flex; flex-direction: column; }
     #map { flex: 1; min-height: 520px; }
 
     .status-bar {
@@ -257,11 +255,7 @@
     <table>
       <thead>
         <tr>
-          <th>#</th>
-          <th>Neighborhood</th>
-          <th>Registered EVs</th>
-          <th>Decayed Supply</th>
-          <th>Deficit Score</th>
+          <th>#</th><th>Neighborhood</th><th>Registered EVs</th><th>Decayed Supply</th><th>Deficit Score</th>
         </tr>
       </thead>
       <tbody id="results-table">
@@ -272,11 +266,9 @@
 </div>
 
 <script>
-  // Init map
   const map = L.map('map', { zoomControl: false }).setView([41.3874, 2.1686], 12);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-  // Base layers
   const darkTile = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     attribution: '© OpenStreetMap © CartoDB', subdomains: 'abcd', maxZoom: 19
   });
@@ -285,19 +277,42 @@
   });
   darkTile.addTo(map);
 
-  // Overlay layers (will be populated after data loads)
   let demandLayer = L.layerGroup().addTo(map);
   let stationsLayer = L.layerGroup().addTo(map);
   let gapsLayer = L.layerGroup().addTo(map);
 
-  // Layer control
-  const baseLayers = { 'Dark': darkTile, 'Light': lightTile };
-  const overlayLayers = {
-    'EV Demand Heatmap': demandLayer,
-    'Current Charging Stations': stationsLayer,
-    'AI-Proposed Expansion Hubs': gapsLayer
-  };
-  L.control.layers(baseLayers, overlayLayers, { position: 'topright', collapsed: false }).addTo(map);
+  L.control.layers(
+    { 'Dark': darkTile, 'Light': lightTile },
+    { 'EV Demand Heatmap': demandLayer, 'Current Charging Stations': stationsLayer, 'AI-Proposed Expansion Hubs': gapsLayer },
+    { position: 'topright', collapsed: false }
+  ).addTo(map);
+
+  // Fetch OSM stations directly from browser (avoids server IP blocks)
+  async function fetchOSMStations() {
+    const query = `[out:json][timeout:25];area[name="Barcelona"]["admin_level"="8"]->.s;(node["amenity"="charging_station"](area.s););out center;`;
+    const urls = [
+      'https://overpass-api.de/api/interpreter',
+      'https://overpass.kumi.systems/api/interpreter',
+      'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+    ];
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          body: `data=${encodeURIComponent(query)}`,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          signal: AbortSignal.timeout(20000)
+        });
+        if (!res.ok) continue;
+        const json = await res.json();
+        const stations = (json.elements || [])
+          .filter(el => el.lat && el.lon)
+          .map(el => ({ lat: el.lat, lon: el.lon }));
+        if (stations.length > 0) return stations;
+      } catch(e) { continue; }
+    }
+    return [];
+  }
 
   function getColor(ev, min, max) {
     const t = max > min ? (ev - min) / (max - min) : 0;
@@ -306,7 +321,7 @@
     return `rgba(240,59,32,${0.6 + t * 0.3})`;
   }
 
-  function renderMap(data) {
+  function renderMap(data, stations) {
     demandLayer.clearLayers();
     stationsLayer.clearLayers();
     gapsLayer.clearLayers();
@@ -314,7 +329,6 @@
     const evCounts = data.geojson.features.map(f => f.properties.EV_Count || 0);
     const min = Math.min(...evCounts), max = Math.max(...evCounts);
 
-    // Demand heatmap
     L.geoJSON(data.geojson, {
       style: f => ({
         fillColor: getColor(f.properties.EV_Count || 0, min, max),
@@ -329,19 +343,15 @@
       }
     }).addTo(demandLayer);
 
-    // Charging stations
-    if (data.stations && data.stations.length > 0) {
-      data.stations.forEach(([lat, lon]) => {
-        const icon = L.divIcon({
-          className: '',
-          html: '<div style="width:8px;height:8px;background:#00e676;border-radius:50%;border:1.5px solid rgba(0,230,118,0.5);box-shadow:0 0 6px rgba(0,230,118,0.7)"></div>',
-          iconSize: [8,8], iconAnchor: [4,4]
-        });
-        L.marker([lat, lon], { icon }).bindTooltip('Existing EV Charger').addTo(stationsLayer);
+    stations.forEach(({ lat, lon }) => {
+      const icon = L.divIcon({
+        className: '',
+        html: '<div style="width:8px;height:8px;background:#00e676;border-radius:50%;border:1.5px solid rgba(0,230,118,0.5);box-shadow:0 0 6px rgba(0,230,118,0.7)"></div>',
+        iconSize: [8,8], iconAnchor: [4,4]
       });
-    }
+      L.marker([lat, lon], { icon }).bindTooltip('Existing EV Charger').addTo(stationsLayer);
+    });
 
-    // Proposed hubs
     data.top_gaps.forEach(g => {
       const icon = L.divIcon({
         className: '',
@@ -361,21 +371,16 @@
     const maxScore = Math.max(...gaps.map(g => g.deficit_score));
     const maxSupply = Math.max(...gaps.map(g => g.decayed_supply));
     document.getElementById('results-table').innerHTML = gaps.map((g, i) => {
-      const scoreClass = g.deficit_score > maxScore * 0.66 ? 'deficit-high' : g.deficit_score > maxScore * 0.33 ? 'deficit-mid' : 'deficit-low';
-      const barW = maxSupply > 0 ? Math.round((g.decayed_supply / maxSupply) * 100) : 4;
+      const sc = g.deficit_score > maxScore * 0.66 ? 'deficit-high' : g.deficit_score > maxScore * 0.33 ? 'deficit-mid' : 'deficit-low';
+      const bw = maxSupply > 0 ? Math.round((g.decayed_supply / maxSupply) * 100) : 4;
       return `<tr>
         <td class="rank">${String(i+1).padStart(2,'0')}</td>
         <td class="neighborhood-name">${g.name}</td>
         <td class="ev-count">${g.ev_count.toLocaleString()}</td>
-        <td><div class="supply-bar-wrap"><div class="supply-bar" style="width:${barW}px"></div><span class="supply-val">${g.decayed_supply}</span></div></td>
-        <td class="deficit-score ${scoreClass}">${g.deficit_score}</td>
+        <td><div class="supply-bar-wrap"><div class="supply-bar" style="width:${bw}px"></div><span class="supply-val">${g.decayed_supply}</span></div></td>
+        <td class="deficit-score ${sc}">${g.deficit_score}</td>
       </tr>`;
     }).join('');
-  }
-
-  function showError(msg) {
-    const b = document.getElementById('error-banner');
-    b.textContent = msg; b.style.display = 'block';
   }
 
   async function loadData() {
@@ -385,19 +390,28 @@
     errorBanner.style.display = 'none';
     btn.disabled = true;
     loader.classList.remove('hidden');
-    document.getElementById('loader-text').textContent = 'FETCHING LIVE OSM DATA...';
-
-    const hubs = document.getElementById('hubs-slider').value;
-    const decay = document.getElementById('decay-slider').value;
 
     try {
-      const res = await fetch(`/api/data?hubs=${hubs}&decay=${decay}`);
+      // Step 1: Fetch OSM stations from browser
+      document.getElementById('loader-text').textContent = 'FETCHING LIVE OSM CHARGERS...';
+      const stations = await fetchOSMStations();
+
+      document.getElementById('loader-text').textContent = 'COMPUTING DEFICIT SCORES...';
+
+      // Step 2: Send stations + config to backend for analysis
+      const hubs = document.getElementById('hubs-slider').value;
+      const decay = document.getElementById('decay-slider').value;
+
+      const res = await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hubs: parseInt(hubs), decay: parseFloat(decay), stations })
+      });
+
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json();
 
-      if (data.error) throw new Error(data.error);
-
-      renderMap(data);
+      renderMap(data, stations);
       renderTable(data.top_gaps);
 
       const m = data.metrics;
@@ -406,17 +420,17 @@
       document.getElementById('m-hubs').textContent = m.num_proposals;
       document.getElementById('m-neighborhoods').textContent = m.total_neighborhoods;
       document.getElementById('table-badge').textContent = `${m.num_proposals} TARGETS IDENTIFIED`;
-
-      const stationNote = m.total_stations === 0 ? ' · OSM chargers unavailable (API timeout)' : '';
       document.getElementById('status-text').textContent =
-        `Live data · ${m.total_stations} chargers · ${m.total_neighborhoods} neighborhoods analyzed${stationNote}`;
+        `Live data · ${m.total_stations} chargers · ${m.total_neighborhoods} neighborhoods analyzed`;
 
       if (m.total_stations === 0) {
-        showError('OSM charger data unavailable — Overpass API may be temporarily down. Deficit scores still calculated.');
+        errorBanner.textContent = 'OSM charger data unavailable — all Overpass API mirrors failed. Deficit scores calculated without charger data.';
+        errorBanner.style.display = 'block';
       }
 
     } catch(e) {
-      showError(`Error: ${e.message}`);
+      document.getElementById('error-banner').textContent = `Error: ${e.message}`;
+      document.getElementById('error-banner').style.display = 'block';
       document.getElementById('status-text').textContent = 'Failed to load data';
       console.error(e);
     } finally {

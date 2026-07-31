@@ -2,13 +2,10 @@ from flask import Flask, render_template, jsonify, request
 import pandas as pd
 import requests
 import numpy as np
-import time
 import json
 from shapely.geometry import Point, Polygon, MultiPolygon
 
 app = Flask(__name__)
-
-# --- CACHED GLOBALS ---
 _cache = {}
 
 def load_demand_data():
@@ -24,33 +21,6 @@ def load_demand_data():
         return df_demand
     except Exception as e:
         return pd.DataFrame()
-
-def fetch_charging_stations(retries=3, delay=3):
-    if 'stations' in _cache:
-        return _cache['stations']
-    overpass_url = "https://overpass-api.de/api/interpreter"
-    overpass_query = """
-    [out:json][timeout:25];
-    area[name="Barcelona"]["admin_level"="8"]->.searchArea;
-    (node["amenity"="charging_station"](area.searchArea););
-    out center;
-    """
-    headers = {
-        'User-Agent': 'SmartCityOptimizationApp/1.0',
-        'Accept': 'application/json',
-        'Referer': 'https://ev-charging-analyzer.onrender.com'
-    }
-    for attempt in range(retries):
-        try:
-            response = requests.post(overpass_url, data={'data': overpass_query}, headers=headers, timeout=30)
-            response.raise_for_status()
-            stations = [(el['lat'], el['lon']) for el in response.json().get('elements', []) if 'lat' in el and 'lon' in el]
-            _cache['stations'] = stations
-            return stations
-        except Exception:
-            if attempt < retries - 1:
-                time.sleep(delay)
-    return []
 
 def load_geojson():
     if 'geojson' in _cache:
@@ -72,13 +42,12 @@ def parse_geometry(geom_dict):
         pass
     return None
 
-def compute_deficits(num_proposals=8, decay_scale_km=1.0):
+def compute_deficits(stations, num_proposals=8, decay_scale_km=1.0):
     df_demand = load_demand_data()
-    stations = fetch_charging_stations()
     bcn_geojson = load_geojson()
 
     if df_demand.empty:
-        return [], [], {}, []
+        return [], {}, []
 
     props = bcn_geojson['features'][0]['properties']
     geo_id_key = next((k for k in props.keys() if k.upper() in ['BARRI', 'C_BARRI', 'CODI_BARRI', 'ID_BARRI']), None)
@@ -127,20 +96,21 @@ def compute_deficits(num_proposals=8, decay_scale_km=1.0):
         'total_neighborhoods': len(neighborhood_deficits)
     }
 
-    return top_gaps, stations, metrics, geojson_copy
+    return top_gaps, metrics, geojson_copy
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/api/data')
+@app.route('/api/data', methods=['POST'])
 def api_data():
-    num_proposals = int(request.args.get('hubs', 8))
-    decay_scale = float(request.args.get('decay', 1.0))
-    top_gaps, stations, metrics, geojson = compute_deficits(num_proposals, decay_scale)
+    body = request.get_json()
+    num_proposals = int(body.get('hubs', 8))
+    decay_scale = float(body.get('decay', 1.0))
+    stations = [(s['lat'], s['lon']) for s in body.get('stations', [])]
+    top_gaps, metrics, geojson = compute_deficits(stations, num_proposals, decay_scale)
     return jsonify({
         'top_gaps': top_gaps,
-        'stations': stations,
         'metrics': metrics,
         'geojson': geojson
     })
