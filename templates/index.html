@@ -94,6 +94,11 @@
     .btn:hover { background: #33ddff; transform: translateY(-1px); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
+    .legend { display: flex; flex-direction: column; gap: 10px; }
+    .legend-item { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Leaflet layer control dark theme */
     .leaflet-control-layers {
       background: var(--surface) !important;
       border: 1px solid var(--border-bright) !important;
@@ -141,9 +146,7 @@
     .rank { font-family: var(--mono); font-size: 11px; color: var(--muted); width: 28px; }
     .neighborhood-name { font-weight: 500; }
     .ev-count { font-family: var(--mono); font-size: 12px; }
-    .supply-bar-wrap { display: flex; align-items: center; gap: 8px; }
-    .supply-bar { height: 4px; background: var(--accent2); border-radius: 2px; min-width: 4px; }
-    .supply-val { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+    .stations-count { font-family: var(--mono); font-size: 12px; color: var(--success); }
     .deficit-score { font-family: var(--mono); font-size: 13px; font-weight: 700; }
     .deficit-high { color: var(--danger); }
     .deficit-mid { color: var(--warning); }
@@ -161,11 +164,16 @@
       animation: spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .loader-text { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; color: var(--muted); }
+    .loader-text { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; color: var(--muted); text-align: center; }
 
     .error-banner {
       background: rgba(255,71,87,0.1); border: 1px solid rgba(255,71,87,0.3);
       color: #ff4757; padding: 10px 16px; border-radius: 8px;
+      font-size: 12px; display: none;
+    }
+    .warn-banner {
+      background: rgba(255,214,0,0.08); border: 1px solid rgba(255,214,0,0.25);
+      color: var(--warning); padding: 10px 16px; border-radius: 8px;
       font-size: 12px; display: none;
     }
 
@@ -184,13 +192,13 @@
 
 <div class="loader-overlay" id="loader">
   <div class="loader-ring"></div>
-  <div class="loader-text" id="loader-text">FETCHING LIVE OSM DATA...</div>
+  <div class="loader-text" id="loader-text">FETCHING LIVE OSM CHARGERS...</div>
 </div>
 
 <header>
   <div class="header-eyebrow">Barcelona Smart City Initiative</div>
   <h1>EV Infrastructure <span>Gap Analyzer</span></h1>
-  <p class="header-sub">Municipal EV registration data cross-referenced against live OpenStreetMap charging infrastructure using distance-decay buffering.</p>
+  <p class="header-sub">Municipal EV registration data cross-referenced against live OpenStreetMap charging infrastructure to identify high-priority expansion zones.</p>
 </header>
 
 <div class="status-bar">
@@ -226,17 +234,31 @@
       <div class="section-label">Configuration</div>
       <div class="controls">
         <div class="error-banner" id="error-banner"></div>
+        <div class="warn-banner" id="warn-banner"></div>
         <div class="control-group">
           <label>Proposed Hubs <span id="hubs-val">8</span></label>
           <input type="range" id="hubs-slider" min="3" max="15" value="8"
             oninput="document.getElementById('hubs-val').textContent=this.value"/>
         </div>
-        <div class="control-group">
-          <label>Decay Scale (km) <span id="decay-val">1.00</span></label>
-          <input type="range" id="decay-slider" min="0.5" max="3.0" step="0.25" value="1.0"
-            oninput="document.getElementById('decay-val').textContent=parseFloat(this.value).toFixed(2)"/>
-        </div>
         <button class="btn" id="run-btn" onclick="loadData()">⚡ Analyze Infrastructure</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Map Legend</div>
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#00e676"></div>
+          Existing EV charger
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#0000FF; box-shadow:0 0 8px rgba(0,0,255,0.6)"></div>
+          Proposed expansion hub
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:linear-gradient(to right,#ffeda0,#f03b20);width:24px;border-radius:2px"></div>
+          EV demand density
+        </div>
       </div>
     </div>
   </aside>
@@ -255,7 +277,11 @@
     <table>
       <thead>
         <tr>
-          <th>#</th><th>Neighborhood</th><th>Registered EVs</th><th>Decayed Supply</th><th>Deficit Score</th>
+          <th>#</th>
+          <th>Neighborhood</th>
+          <th>Registered EVs</th>
+          <th>Existing Chargers</th>
+          <th>Deficit Score</th>
         </tr>
       </thead>
       <tbody id="results-table">
@@ -283,19 +309,19 @@
 
   L.control.layers(
     { 'Dark': darkTile, 'Light': lightTile },
-    { 'EV Demand Heatmap': demandLayer, 'Current Charging Stations': stationsLayer, 'AI-Proposed Expansion Hubs': gapsLayer },
+    { 'Actual EV Demand Heatmap': demandLayer, 'Current Charging Stations': stationsLayer, 'AI-Proposed Infrastructure Gaps': gapsLayer },
     { position: 'topright', collapsed: false }
   ).addTo(map);
 
-  // Fetch OSM stations directly from browser (avoids server IP blocks)
+  // Fetch OSM from browser using multiple mirrors
   async function fetchOSMStations() {
     const query = `[out:json][timeout:25];area[name="Barcelona"]["admin_level"="8"]->.s;(node["amenity"="charging_station"](area.s););out center;`;
-    const urls = [
+    const mirrors = [
       'https://overpass-api.de/api/interpreter',
       'https://overpass.kumi.systems/api/interpreter',
       'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
     ];
-    for (const url of urls) {
+    for (const url of mirrors) {
       try {
         const res = await fetch(url, {
           method: 'POST',
@@ -305,9 +331,7 @@
         });
         if (!res.ok) continue;
         const json = await res.json();
-        const stations = (json.elements || [])
-          .filter(el => el.lat && el.lon)
-          .map(el => ({ lat: el.lat, lon: el.lon }));
+        const stations = (json.elements || []).filter(e => e.lat && e.lon).map(e => ({ lat: e.lat, lon: e.lon }));
         if (stations.length > 0) return stations;
       } catch(e) { continue; }
     }
@@ -316,9 +340,9 @@
 
   function getColor(ev, min, max) {
     const t = max > min ? (ev - min) / (max - min) : 0;
-    if (t < 0.33) return `rgba(255,237,160,${0.3 + t * 0.4})`;
-    if (t < 0.66) return `rgba(254,178,76,${0.5 + t * 0.3})`;
-    return `rgba(240,59,32,${0.6 + t * 0.3})`;
+    if (t < 0.33) return `rgba(255,237,160,${0.3 + t*0.4})`;
+    if (t < 0.66) return `rgba(254,178,76,${0.5 + t*0.3})`;
+    return `rgba(240,59,32,${0.6 + t*0.3})`;
   }
 
   function renderMap(data, stations) {
@@ -329,55 +353,59 @@
     const evCounts = data.geojson.features.map(f => f.properties.EV_Count || 0);
     const min = Math.min(...evCounts), max = Math.max(...evCounts);
 
+    // Layer 1: Demand heatmap
     L.geoJSON(data.geojson, {
       style: f => ({
         fillColor: getColor(f.properties.EV_Count || 0, min, max),
-        color: 'rgba(255,255,255,0.1)', weight: 1, fillOpacity: 0.75
+        color: 'black', weight: 1, fillOpacity: 0.7, opacity: 0.2
       }),
       onEachFeature: (f, layer) => {
         layer.bindTooltip(`
-          <div style="font-family:'Space Grotesk',sans-serif;background:#0e1420;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 14px;color:#e8edf5;font-size:13px">
+          <div style="font-family:'Space Grotesk',sans-serif;background:white;color:#333;padding:8px 12px;border-radius:4px;font-size:13px">
             <strong>${f.properties.Display_Name || 'Unknown'}</strong><br/>
-            <span style="color:#6b7a96">EVs:</span> <span style="color:#00d4ff;font-family:'Space Mono',monospace">${f.properties.EV_Count || 0}</span>
+            Registered EVs: <strong>${f.properties.EV_Count || 0}</strong>
           </div>`, { sticky: true });
       }
     }).addTo(demandLayer);
 
+    // Layer 2: Existing charging stations (green circles like original)
     stations.forEach(({ lat, lon }) => {
-      const icon = L.divIcon({
-        className: '',
-        html: '<div style="width:8px;height:8px;background:#00e676;border-radius:50%;border:1.5px solid rgba(0,230,118,0.5);box-shadow:0 0 6px rgba(0,230,118,0.7)"></div>',
-        iconSize: [8,8], iconAnchor: [4,4]
-      });
-      L.marker([lat, lon], { icon }).bindTooltip('Existing EV Charger').addTo(stationsLayer);
+      L.circleMarker([lat, lon], {
+        radius: 3,
+        color: '#006400',
+        fillColor: '#32CD32',
+        fillOpacity: 0.9,
+        weight: 1
+      }).bindTooltip('Existing EV Charger').addTo(stationsLayer);
     });
 
+    // Layer 3: Proposed hubs (blue circles like original)
     data.top_gaps.forEach(g => {
-      const icon = L.divIcon({
-        className: '',
-        html: '<div style="width:18px;height:18px;background:#7c3aed;border-radius:50%;border:2px solid rgba(124,58,237,0.5);box-shadow:0 0 14px rgba(124,58,237,0.8)"></div>',
-        iconSize: [18,18], iconAnchor: [9,9]
-      });
-      L.marker(g.coord, { icon }).bindTooltip(`
-        <div style="font-family:'Space Grotesk',sans-serif;background:#0e1420;border:1px solid rgba(124,58,237,0.3);border-radius:8px;padding:10px 14px;color:#e8edf5;font-size:13px;min-width:180px">
-          <strong style="color:#a78bfa">${g.name}</strong><br/>
-          <span style="color:#6b7a96">EVs:</span> <span style="font-family:'Space Mono',monospace">${g.ev_count}</span><br/>
-          <span style="color:#6b7a96">Deficit Score:</span> <span style="color:#ff4757;font-family:'Space Mono',monospace">${g.deficit_score}</span>
+      L.circleMarker(g.coord, {
+        radius: 10,
+        color: '#00008B',
+        fillColor: '#0000FF',
+        fillOpacity: 1.0,
+        weight: 2.5
+      }).bindTooltip(`
+        <div style="font-family:'Space Grotesk',sans-serif;background:white;color:#333;padding:8px 12px;border-radius:4px;font-size:13px">
+          <strong>${g.name}</strong><br/>
+          EVs: <strong>${g.ev_count}</strong><br/>
+          Existing Chargers: <strong>${g.stations}</strong><br/>
+          Deficit Score: <strong>${g.deficit_score}</strong>
         </div>`).addTo(gapsLayer);
     });
   }
 
   function renderTable(gaps) {
     const maxScore = Math.max(...gaps.map(g => g.deficit_score));
-    const maxSupply = Math.max(...gaps.map(g => g.decayed_supply));
     document.getElementById('results-table').innerHTML = gaps.map((g, i) => {
       const sc = g.deficit_score > maxScore * 0.66 ? 'deficit-high' : g.deficit_score > maxScore * 0.33 ? 'deficit-mid' : 'deficit-low';
-      const bw = maxSupply > 0 ? Math.round((g.decayed_supply / maxSupply) * 100) : 4;
       return `<tr>
         <td class="rank">${String(i+1).padStart(2,'0')}</td>
         <td class="neighborhood-name">${g.name}</td>
         <td class="ev-count">${g.ev_count.toLocaleString()}</td>
-        <td><div class="supply-bar-wrap"><div class="supply-bar" style="width:${bw}px"></div><span class="supply-val">${g.decayed_supply}</span></div></td>
+        <td class="stations-count">${g.stations}</td>
         <td class="deficit-score ${sc}">${g.deficit_score}</td>
       </tr>`;
     }).join('');
@@ -386,26 +414,30 @@
   async function loadData() {
     const btn = document.getElementById('run-btn');
     const loader = document.getElementById('loader');
-    const errorBanner = document.getElementById('error-banner');
-    errorBanner.style.display = 'none';
+    document.getElementById('error-banner').style.display = 'none';
+    document.getElementById('warn-banner').style.display = 'none';
     btn.disabled = true;
     loader.classList.remove('hidden');
 
     try {
-      // Step 1: Fetch OSM stations from browser
+      // Step 1: fetch OSM from browser
       document.getElementById('loader-text').textContent = 'FETCHING LIVE OSM CHARGERS...';
       const stations = await fetchOSMStations();
 
-      document.getElementById('loader-text').textContent = 'COMPUTING DEFICIT SCORES...';
+      if (stations.length === 0) {
+        const wb = document.getElementById('warn-banner');
+        wb.textContent = 'OSM charger data unavailable — all mirrors failed. Deficit scores calculated without charger data.';
+        wb.style.display = 'block';
+      }
 
-      // Step 2: Send stations + config to backend for analysis
+      // Step 2: send to backend for analysis
+      document.getElementById('loader-text').textContent = 'COMPUTING DEFICIT SCORES...';
       const hubs = document.getElementById('hubs-slider').value;
-      const decay = document.getElementById('decay-slider').value;
 
       const res = await fetch('/api/data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hubs: parseInt(hubs), decay: parseFloat(decay), stations })
+        body: JSON.stringify({ hubs: parseInt(hubs), stations })
       });
 
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
@@ -421,12 +453,7 @@
       document.getElementById('m-neighborhoods').textContent = m.total_neighborhoods;
       document.getElementById('table-badge').textContent = `${m.num_proposals} TARGETS IDENTIFIED`;
       document.getElementById('status-text').textContent =
-        `Live data · ${m.total_stations} chargers · ${m.total_neighborhoods} neighborhoods analyzed`;
-
-      if (m.total_stations === 0) {
-        errorBanner.textContent = 'OSM charger data unavailable — all Overpass API mirrors failed. Deficit scores calculated without charger data.';
-        errorBanner.style.display = 'block';
-      }
+        `Live data · ${m.total_stations} chargers located · ${m.total_neighborhoods} neighborhoods analyzed`;
 
     } catch(e) {
       document.getElementById('error-banner').textContent = `Error: ${e.message}`;

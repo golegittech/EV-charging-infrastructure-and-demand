@@ -11,16 +11,13 @@ _cache = {}
 def load_demand_data():
     if 'demand' in _cache:
         return _cache['demand']
-    try:
-        df = pd.read_csv('bcn_vehicles_2025.csv', sep=None, engine='python')
-        df_electric = df[df['Tipus_Propulsio'].astype(str).str.contains('Elèctric|Electric', case=False, na=False)]
-        df_demand = df_electric.groupby(['Codi_Barri', 'Nom_Barri'])['Nombre'].sum().reset_index()
-        df_demand['Codi_Barri'] = df_demand['Codi_Barri'].astype(str).str.zfill(2)
-        df_demand.columns = ['Neighborhood_ID', 'Neighborhood_Name', 'EV_Count']
-        _cache['demand'] = df_demand
-        return df_demand
-    except Exception as e:
-        return pd.DataFrame()
+    df = pd.read_csv('bcn_vehicles_2025.csv', sep=None, engine='python')
+    df_electric = df[df['Tipus_Propulsio'].astype(str).str.contains('Elèctric|Electric', case=False, na=False)]
+    df_demand = df_electric.groupby(['Codi_Barri', 'Nom_Barri'])['Nombre'].sum().reset_index()
+    df_demand['Codi_Barri'] = df_demand['Codi_Barri'].astype(str).str.zfill(2)
+    df_demand.columns = ['Neighborhood_ID', 'Neighborhood_Name', 'EV_Count']
+    _cache['demand'] = df_demand
+    return df_demand
 
 def load_geojson():
     if 'geojson' in _cache:
@@ -42,12 +39,9 @@ def parse_geometry(geom_dict):
         pass
     return None
 
-def compute_deficits(stations, num_proposals=8, decay_scale_km=1.0):
+def compute_deficits(stations, num_proposals=8):
     df_demand = load_demand_data()
     bcn_geojson = load_geojson()
-
-    if df_demand.empty:
-        return [], {}, []
 
     props = bcn_geojson['features'][0]['properties']
     geo_id_key = next((k for k in props.keys() if k.upper() in ['BARRI', 'C_BARRI', 'CODI_BARRI', 'ID_BARRI']), None)
@@ -55,6 +49,8 @@ def compute_deficits(stations, num_proposals=8, decay_scale_km=1.0):
 
     demand_dict = dict(zip(df_demand['Neighborhood_ID'], df_demand['EV_Count']))
     name_dict = dict(zip(df_demand['Neighborhood_ID'], df_demand['Neighborhood_Name']))
+
+    # Use Point(lon, lat) exactly like your original
     station_points = [Point(lon, lat) for lat, lon in stations]
 
     neighborhood_deficits = []
@@ -70,19 +66,16 @@ def compute_deficits(stations, num_proposals=8, decay_scale_km=1.0):
         if 'geometry' in feature and feature['geometry']:
             poly = parse_geometry(feature['geometry'])
             if poly and poly.is_valid:
+                # Exact same logic as your original: count stations inside polygon
+                station_count = sum(1 for pt in station_points if poly.contains(pt))
+                deficit_score = ev_count / (station_count + 1)
                 centroid = poly.centroid
-                centroid_pt = Point(centroid.x, centroid.y)
-                decayed_supply = sum(
-                    np.exp(-centroid_pt.distance(s_pt) * 111.0 / decay_scale_km)
-                    for s_pt in station_points
-                )
-                deficit_score = ev_count / (decayed_supply + 1.0)
                 neighborhood_deficits.append({
                     'id': raw_id,
                     'name': name,
                     'ev_count': int(ev_count),
-                    'decayed_supply': round(float(decayed_supply), 2),
-                    'deficit_score': round(float(deficit_score), 2),
+                    'stations': station_count,
+                    'deficit_score': round(float(deficit_score), 1),
                     'coord': [round(centroid.y, 6), round(centroid.x, 6)]
                 })
 
@@ -106,14 +99,9 @@ def index():
 def api_data():
     body = request.get_json()
     num_proposals = int(body.get('hubs', 8))
-    decay_scale = float(body.get('decay', 1.0))
     stations = [(s['lat'], s['lon']) for s in body.get('stations', [])]
-    top_gaps, metrics, geojson = compute_deficits(stations, num_proposals, decay_scale)
-    return jsonify({
-        'top_gaps': top_gaps,
-        'metrics': metrics,
-        'geojson': geojson
-    })
+    top_gaps, metrics, geojson = compute_deficits(stations, num_proposals)
+    return jsonify({'top_gaps': top_gaps, 'metrics': metrics, 'geojson': geojson})
 
 if __name__ == '__main__':
     app.run(debug=True)
